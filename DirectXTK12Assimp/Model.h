@@ -1,5 +1,7 @@
 #pragma once
 #pragma once
+#include "pch.h"
+
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -26,19 +28,19 @@ namespace education {
 		Assimp::Importer m_importer;
 
 		//バッファ
-		Microsoft::WRL::ComPtr<ID3D11Buffer> m_vertexBuffer;
-		Microsoft::WRL::ComPtr<ID3D11Buffer> m_indexBuffer;
+		Microsoft::WRL::ComPtr<ID3D12Resource> m_vertexBuffer;
+		Microsoft::WRL::ComPtr<ID3D12Resource> m_indexBuffer;
 
-
+		std::vector<D3D12_INPUT_ELEMENT_DESC> m_layout;
 		std::vector<DirectX::VertexPositionNormalColorTexture> vertices;
 		std::vector<unsigned short> indices;
 
 		DirectX::XMMATRIX modelmat;
 		//シェーダーの作成
-		Microsoft::WRL::ComPtr<ID3D11VertexShader> m_vertexShader;
-		Microsoft::WRL::ComPtr<ID3D11PixelShader> m_pixelShader;
-		Microsoft::WRL::ComPtr<ID3D11InputLayout>	m_modelInputLayout = nullptr;// 入力レイアウト
-		Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_rasterizerState;
+		Microsoft::WRL::ComPtr<ID3DBlob> vertexShader;//新規追加
+		Microsoft::WRL::ComPtr<ID3DBlob> pixelShader;//新規追加
+		
+		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_pipelineState;//新規追加
 	};
 
 }
