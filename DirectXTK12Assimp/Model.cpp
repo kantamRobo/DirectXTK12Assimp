@@ -285,4 +285,3 @@ void education::Model::Draw(const DX::DeviceResources* DR) {
 }
 
 
-
