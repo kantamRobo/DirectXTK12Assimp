@@ -4,14 +4,12 @@
 
 
 #define NOMINMAX
-#include <BufferHelpers.h>
 #include <iostream>
 #include <cassert>
 #include <d3dcompiler.h>
 #include <algorithm>
 #include <functional>
 #include "Model.h"
-#include <ResourceUploadBatch.h>
 #pragma comment(lib, "d3dcompiler.lib")
 
 

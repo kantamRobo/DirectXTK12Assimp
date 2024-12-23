@@ -36,17 +36,6 @@
 #endif
 
 #include <wrl/client.h>
-
-#ifdef USING_DIRECTX_HEADERS
-#include <directx/dxgiformat.h>
-#include <directx/d3d12.h>
-#include <directx/d3dx12.h>
-#include <dxguids/dxguids.h>
-#else
-#include <d3d12.h>
-
-#include "d3dx12.h"
-#endif
 #include "BufferHelpers.h"
 #include "CommonStates.h"
 #include "DDSTextureLoader.h"
@@ -66,6 +55,16 @@
 #include "SpriteFont.h"
 #include "VertexTypes.h"
 #include "WICTextureLoader.h"
+#ifdef USING_DIRECTX_HEADERS
+#include <directx/dxgiformat.h>
+#include <directx/d3d12.h>
+#include <directx/d3dx12.h>
+#include <dxguids/dxguids.h>
+#else
+#include <d3d12.h>
+
+#include "d3dx12.h"
+#endif
 
 #include <dxgi1_6.h>
 
