@@ -9,7 +9,7 @@
 #include <d3dcompiler.h>
 #include <algorithm>
 #include <functional>
-#include "Model.h"
+#include <ResourceUploadBatch.h>
 #pragma comment(lib, "d3dcompiler.lib")
 
 
@@ -17,7 +17,7 @@
 
 
 
-education::Model::Model(DX::DeviceResources* deviceresources, const char* path)
+education::Model::Model(DX::DeviceResources* deviceresources, const char* path,int height,int width)
 {
     if (!LoadModel(path))
     {
@@ -27,19 +27,19 @@ education::Model::Model(DX::DeviceResources* deviceresources, const char* path)
     /*
     追加分
     */
-    if (FAILED(CreateBuffer(deviceresources)))
+    if (FAILED(CreateBuffer(deviceresources,width,height)))
     {
         std::abort();
     }
-    if (FAILED(CreateShaders(deviceresources)))
+    if (FAILED((deviceresources)))
     {
         std::abort();
     }
-    if (FAILED(craetepipelineState(deviceresources)))
-    {
-        std::abort();
-    }
-
+	m_pipelineState = CreateGraphicsPipelineState(deviceresources->GetD3DDevice(), m_rootSignature, L"VertexShader.hlsl", L"PixelShader.hlsl");
+	if (m_pipelineState == nullptr)
+	{
+		std::abort();
+	}
 }
 
 bool education::Model::LoadModel(const char* path)
@@ -127,7 +127,7 @@ std::vector<DirectX::VertexPositionNormalColorTexture> education::Model::Generat
     return outvertices;
 }
 
-HRESULT education::Model::CreateBuffer(DX::DeviceResources* deviceResources)
+HRESULT education::Model::CreateBuffer(DX::DeviceResources* deviceResources,int height,int width)
 {
 	DirectX::ResourceUploadBatch resourceUpload(deviceResources->GetD3DDevice());
 
@@ -156,130 +156,239 @@ HRESULT education::Model::CreateBuffer(DX::DeviceResources* deviceResources)
             m_indexBuffer.GetAddressOf()
         )
     );
+
+	
+    //(DirectXTK12Assimpで追加)
+	m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+	m_vertexBufferView.StrideInBytes = sizeof(DirectX::VertexPositionNormalColorTexture);
+	m_vertexBufferView.SizeInBytes = sizeof(DirectX::VertexPositionNormalColorTexture) * vertices.size();
+
+	m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+	m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
+	m_indexBufferView.SizeInBytes = sizeof(unsigned short) * indices.size();
+
+    DirectX::XMMATRIX worldMatrix = DirectX::XMMatrixTranslation(0.0f, 0.0f, 0.0f);
+
+    DirectX::XMVECTOR eye = DirectX::XMVectorSet(2.0f, 2.0f, -2.0f, 0.0f);
+    DirectX::XMVECTOR focus = DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
+    DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    DirectX::XMMATRIX viewMatrix = DirectX::XMMatrixLookAtLH(eye, focus, up);
+
+    float    fov = DirectX::XMConvertToRadians(45.0f);
+    float    aspect = height / width;
+    float    nearZ = 0.1f;
+    float    farZ = 100.0f;
+    DirectX::XMMATRIX projMatrix = DirectX::XMMatrixPerspectiveFovLH(fov, aspect, nearZ, farZ);
+
+    SceneCB cb;
+    XMStoreFloat4x4(&cb.world, XMMatrixTranspose(worldMatrix));
+    XMStoreFloat4x4(&cb.view, XMMatrixTranspose(viewMatrix));
+    XMStoreFloat4x4(&cb.projection, XMMatrixTranspose(projMatrix));
+
+  
+    //定数バッファの作成(DIrectXTK12Assimpで追加)
+    DX::ThrowIfFailed(
+        DirectX::CreateStaticBuffer(
+            deviceResources->GetD3DDevice(),
+            resourceUpload,
+            &cb,
+            sizeof(cb),
+            sizeof(unsigned short),
+            D3D12_RESOURCE_STATE_COMMON,
+			m_ConstantBuffer.GetAddressOf()
+        )
+    );
+
+    //定数バッファをマップ(DIrectXTK12Assimpで追加)
+	CD3DX12_RANGE readRange(0, 0);
+	void* m_pCbvDataBegin;
+	DX::ThrowIfFailed(
+		m_ConstantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_pCbvDataBegin))
+	);
+	//定数バッファにデータをコピー
+	memcpy(m_pCbvDataBegin, &cb, sizeof(cb));
+	//定数バッファをアンマップ
+	m_ConstantBuffer->Unmap(0, nullptr);
+	// リソースのアップロードを終了
+	auto uploadResourcesFinished = resourceUpload.End(deviceResources->GetCommandQueue());
     return S_OK;
 }
-HRESULT education::Model::CreateShaders(const DX::DeviceResources* deviceResources)
+
+
+using Microsoft::WRL::ComPtr;
+//(DIrectXTK12Assimpで追加)
+// グラフィックパイプラインステートを作成する関数
+ComPtr<ID3D12PipelineState> education::Model::CreateGraphicsPipelineState(
+    ComPtr<ID3D12Device> device,
+    ComPtr<ID3D12RootSignature> rootSignature,
+    const std::wstring& vertexShaderPath,
+    const std::wstring& pixelShaderPath)
 {
-    //パイプラインステートの作成
-    auto device = deviceResources->GetD3DDevice();
+    // シェーダーをコンパイル
+    ComPtr<ID3DBlob> vertexShader;
+    ComPtr<ID3DBlob> pixelShader;
+    ComPtr<ID3DBlob> errorBlob;
 
- 
+    HRESULT hr = D3DCompileFromFile(
+        vertexShaderPath.c_str(),
+        nullptr,
+        nullptr,
+        "main", // エントリーポイント
+        "vs_5_0", // シェーダーモデル
+        0,
+        0,
+        &vertexShader,
+        &errorBlob
+    );
 
-    // 頂点シェーダーのコンパイル
-    Microsoft::WRL::ComPtr<ID3DBlob> pVSBlob;
-    Microsoft::WRL::ComPtr<ID3DBlob> perrrorBlob;
-    auto hr = D3DCompileFromFile(L"VertexShader.hlsl", nullptr, nullptr, "main", "vs_5_0", 0, 0, pVSBlob.GetAddressOf(), perrrorBlob.GetAddressOf());
-    if (FAILED(hr))
-    {
-        OutputDebugStringA(reinterpret_cast<const char*>(perrrorBlob->GetBufferPointer()));
-        return hr;
+    if (FAILED(hr)) {
+        if (errorBlob) {
+            OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+        }
+        throw std::runtime_error("Failed to compile vertex shader");
     }
 
-   
-    if (FAILED(hr))
-    {
-        OutputDebugStringA(reinterpret_cast<const char*>(perrrorBlob->GetBufferPointer()));
-        return hr;
+    hr = D3DCompileFromFile(
+        pixelShaderPath.c_str(),
+        nullptr,
+        nullptr,
+        "main",
+        "ps_5_0",
+        0,
+        0,
+        &pixelShader,
+        &errorBlob
+    );
+
+    if (FAILED(hr)) {
+        if (errorBlob) {
+            OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+        }
+        throw std::runtime_error("Failed to compile pixel shader");
     }
 
-
-    // ピクセルシェーダーのコンパイル
-    Microsoft::WRL::ComPtr<ID3DBlob> pPSBlob;
-    hr = D3DCompileFromFile(L"PixelShader.hlsl", nullptr, nullptr, "main", "ps_5_0", 0, 0, pPSBlob.GetAddressOf(), nullptr);
-
-    if (FAILED(hr))
-    {
-        OutputDebugStringA(reinterpret_cast<const char*>(perrrorBlob->GetBufferPointer()));
-        return hr;
-    }
-
-    if (FAILED(hr))
-    {
-        OutputDebugStringA(reinterpret_cast<const char*>(perrrorBlob->GetBufferPointer()));
-        return hr;
-    }
-    // 入力レイアウトの作成
-    layout =
-    {
+    // 入力レイアウトを定義
+    D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     };
-    UINT numElements = ARRAYSIZE(layout);
 
-   
-    if (FAILED(hr))
-    {
-        return hr;
-    }
-
-
-
-
-    return hr;
-}
-
-
-HRESULT education::Model::craetepipelineState(const DX::DeviceResources* deviceResources)
-{
-	auto device = deviceResources->GetD3DDevice();
+    // ラスタライザーステート
     D3D12_RASTERIZER_DESC rasterizerDesc = {};
     rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
-    rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+    rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
+    rasterizerDesc.FrontCounterClockwise = FALSE;
+    rasterizerDesc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
+    rasterizerDesc.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+    rasterizerDesc.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+    rasterizerDesc.DepthClipEnable = TRUE;
+    rasterizerDesc.MultisampleEnable = FALSE;
+    rasterizerDesc.AntialiasedLineEnable = FALSE;
+    rasterizerDesc.ForcedSampleCount = 0;
+    rasterizerDesc.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
 
-    // 注意
-    rasterizerDesc.FrontCounterClockwise = true;
-  
-    rasterizerDesc.DepthClipEnable = true;
-    rasterizerDesc.MultisampleEnable = false;
-    rasterizerDesc.AntialiasedLineEnable = false;
+    // ブレンドステート
+    D3D12_BLEND_DESC blendDesc = {};
+    blendDesc.AlphaToCoverageEnable = FALSE;
+    blendDesc.IndependentBlendEnable = FALSE;
+    blendDesc.RenderTarget[0].BlendEnable = FALSE;
+    blendDesc.RenderTarget[0].LogicOpEnable = FALSE;
+    blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 
-    
+    // 深度/ステンシルステート
+    D3D12_DEPTH_STENCIL_DESC depthStencilDesc = {};
+    depthStencilDesc.DepthEnable = TRUE;
+    depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+    depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+    depthStencilDesc.StencilEnable = FALSE;
+
+    // グラフィックパイプラインステートの設定
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-    psoDesc.InputLayout = { m_layout.data(), static_cast<UINT>(m_layout.size() )};
-    psoDesc.pRootSignature = m_rootSignature.Get();
-    psoDesc.VS = { reinterpret_cast<UINT8*>(vertexShader->GetBufferPointer()), vertexShader->GetBufferSize() };
-    psoDesc.PS = { reinterpret_cast<UINT8*>(pixelShader->GetBufferPointer()), pixelShader->GetBufferSize() };
-    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-    psoDesc.DepthStencilState.DepthEnable = FALSE;
-    psoDesc.DepthStencilState.StencilEnable = FALSE;
+    psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+    psoDesc.pRootSignature = rootSignature.Get();
+    psoDesc.VS = { vertexShader->GetBufferPointer(), vertexShader->GetBufferSize() };
+    psoDesc.PS = { pixelShader->GetBufferPointer(), pixelShader->GetBufferSize() };
+    psoDesc.RasterizerState = rasterizerDesc;
+    psoDesc.BlendState = blendDesc;
+    psoDesc.DepthStencilState = depthStencilDesc;
     psoDesc.SampleMask = UINT_MAX;
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     psoDesc.NumRenderTargets = 1;
     psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
     psoDesc.SampleDesc.Count = 1;
-    DX::ThrowIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
 
-
-    if (FAILED(hr))
-    {
-        return hr;
+    // パイプラインステートオブジェクトを作成
+    ComPtr<ID3D12PipelineState> pipelineState;
+    hr = device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState));
+    if (FAILED(hr)) {
+        throw std::runtime_error("Failed to create pipeline state");
     }
 
-    return hr;
+    return pipelineState;
+}
+//(DIrectXTK12Assimpで追加)
+void education::Model::CreateDescriptors(DX::DeviceResources* DR)
+{
+
+	m_resourceDescriptors = std::make_unique<DirectX::DescriptorHeap>(
+		DR->GetD3DDevice(),
+		D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+		D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
+		Descriptors::Count
+	);
 }
 
 
 
 
 
+//(DIrectXTK12Assimpで追加)
 void education::Model::Draw(const DX::DeviceResources* DR) {
+
+
+    DirectX::ResourceUploadBatch resourceUpload(DR->GetD3DDevice());
+    
+    resourceUpload.Begin();
     if (vertices.empty() || indices.empty()) {
+        OutputDebugStringA("Vertices or indices buffer is empty.\n");
         return;
     }
-    auto device = DR->GetD3DDevice();
-    UINT size = sizeof(DirectX::VertexPositionNormalColorTexture);
-    auto offset = 0u;
-    auto context = DR->GetD3DDeviceContext();
-    context->IASetInputLayout(m_modelInputLayout.Get());
-    context->IASetIndexBuffer(m_indexBuffer.Get(), DXGI_FORMAT_R16_UINT, 0);
 
-    context->IASetVertexBuffers(0, 1, m_vertexBuffer.GetAddressOf(), &size, &offset);
-    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
-    context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
-    context->DrawIndexedInstanced(indices.size(), 1, 0, 0, 0);
+    auto commandList = DR->GetCommandList();
+	auto renderTarget = DR->GetRenderTarget();
+    if (!commandList) {
+        OutputDebugStringA("Command list is null.\n");
+        return;
+    }
+
+    // 入力アセンブラー設定
+    commandList->IASetIndexBuffer(&m_indexBufferView);
+    commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+   
+
+    // ルートシグネチャ設定
+    commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+
+    
+    commandList->SetGraphicsRootDescriptorTable(0, m_resourceDescriptors->GetGpuHandle(Count));
+
+    // パイプラインステート設定
+    commandList->SetPipelineState(m_pipelineState.Get());
+
+    // 描画コール
+    commandList->DrawIndexedInstanced(
+        static_cast<UINT>(indices.size()), // インデックス数
+        1,                                 // インスタンス数
+        0,                                 // 開始インデックス
+        0,                                 // 頂点オフセット
+        0                                  // インスタンスオフセット
+    );
+    auto uploadResourcesFinished = resourceUpload.End(
+        DR->GetCommandQueue());
+
+    uploadResourcesFinished.wait();
 }
-
-

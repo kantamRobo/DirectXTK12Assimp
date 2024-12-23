@@ -34,7 +34,9 @@
 #ifdef __MINGW32__
 #include <unknwn.h>
 #endif
-
+#include <d3d12.h>
+#include <wrl.h>
+#include "d3dx12.h"
 #include <wrl/client.h>
 #include "BufferHelpers.h"
 #include "CommonStates.h"
@@ -61,9 +63,7 @@
 #include <directx/d3dx12.h>
 #include <dxguids/dxguids.h>
 #else
-#include <d3d12.h>
 
-#include "d3dx12.h"
 #endif
 
 #include <dxgi1_6.h>
