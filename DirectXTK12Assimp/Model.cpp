@@ -17,7 +17,7 @@
 
 
 
-education::Model::Model(DX::DeviceResources* deviceresources, const char* path,int height,int width)
+education::Model::Model(DirectX::GraphicsMemory* graphicsmemory,DX::DeviceResources* deviceresources, const char* path,int height,int width)
 {
     if (!LoadModel(path))
     {
@@ -27,14 +27,14 @@ education::Model::Model(DX::DeviceResources* deviceresources, const char* path,i
     /*
     追加分
     */
-    if (FAILED(CreateBuffer(deviceresources,width,height)))
+    if (FAILED(CreateBuffer(graphicsmemory,deviceresources,width,height)))
     {
         std::abort();
     }
-    if (FAILED((deviceresources)))
-    {
-        std::abort();
-    }
+    CreateDescriptors(deviceresources);
+    
+	// ルートシグネチャの作成
+    
 	m_pipelineState = CreateGraphicsPipelineState(deviceresources->GetD3DDevice(), m_rootSignature, L"VertexShader.hlsl", L"PixelShader.hlsl");
 	if (m_pipelineState == nullptr)
 	{
@@ -127,7 +127,7 @@ std::vector<DirectX::VertexPositionNormalColorTexture> education::Model::Generat
     return outvertices;
 }
 
-HRESULT education::Model::CreateBuffer(DX::DeviceResources* deviceResources,int height,int width)
+HRESULT education::Model::CreateBuffer(DirectX::GraphicsMemory* graphicsmemory,DX::DeviceResources* deviceResources,int height,int width)
 {
 	DirectX::ResourceUploadBatch resourceUpload(deviceResources->GetD3DDevice());
 
@@ -174,8 +174,8 @@ HRESULT education::Model::CreateBuffer(DX::DeviceResources* deviceResources,int 
     DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
     DirectX::XMMATRIX viewMatrix = DirectX::XMMatrixLookAtLH(eye, focus, up);
 
-    float    fov = DirectX::XMConvertToRadians(45.0f);
-    float    aspect = height / width;
+    constexpr float fov = DirectX::XMConvertToRadians(45.0f);
+    float    aspect = (height / width);
     float    nearZ = 0.1f;
     float    farZ = 100.0f;
     DirectX::XMMATRIX projMatrix = DirectX::XMMatrixPerspectiveFovLH(fov, aspect, nearZ, farZ);
@@ -187,28 +187,12 @@ HRESULT education::Model::CreateBuffer(DX::DeviceResources* deviceResources,int 
 
   
     //定数バッファの作成(DIrectXTK12Assimpで追加)
-    DX::ThrowIfFailed(
-        DirectX::CreateStaticBuffer(
-            deviceResources->GetD3DDevice(),
-            resourceUpload,
-            &cb,
-            sizeof(cb),
-            sizeof(unsigned short),
-            D3D12_RESOURCE_STATE_COMMON,
-			m_ConstantBuffer.GetAddressOf()
-        )
-    );
+  
+    //https://github.com/microsoft/DirectXTK12/wiki/GraphicsMemory
+  
 
-    //定数バッファをマップ(DIrectXTK12Assimpで追加)
-	CD3DX12_RANGE readRange(0, 0);
-	void* m_pCbvDataBegin;
-	DX::ThrowIfFailed(
-		m_ConstantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_pCbvDataBegin))
-	);
-	//定数バッファにデータをコピー
-	memcpy(m_pCbvDataBegin, &cb, sizeof(cb));
-	//定数バッファをアンマップ
-	m_ConstantBuffer->Unmap(0, nullptr);
+SceneCBResource = graphicsmemory->AllocateConstant(cb);
+   
 	// リソースのアップロードを終了
 	auto uploadResourcesFinished = resourceUpload.End(deviceResources->GetCommandQueue());
     return S_OK;

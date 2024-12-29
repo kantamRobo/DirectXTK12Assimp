@@ -2,7 +2,7 @@
 
 #include "pch.h"
 #include <vector>
-#include "Model.h"
+
 #include <DeviceResources.h>
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -29,10 +29,10 @@ namespace education {
 
 		~Model() {};
 		
-		Model(DX::DeviceResources* deviceresources, const char* path, int height, int width);
+		Model(DirectX::GraphicsMemory* graphicsmemory,DX::DeviceResources* deviceresources, const char* path, int height, int width);
 		bool LoadModel(const char* path);
 		std::vector<DirectX::VertexPositionNormalColorTexture> GenerateVertices();
-		HRESULT CreateBuffer(DX::DeviceResources* deviceResources, int height, int width);
+		HRESULT CreateBuffer(DirectX::GraphicsMemory* graphicsmemory,DX::DeviceResources* deviceResources, int height, int width);
 		
 		
 		std::unique_ptr<DirectX::DescriptorHeap> m_resourceDescriptors;
@@ -61,7 +61,7 @@ namespace education {
 		//シェーダーの作成
 		Microsoft::WRL::ComPtr<ID3DBlob> vertexShader;//新規追加
 		Microsoft::WRL::ComPtr<ID3DBlob> pixelShader;//新規追加
-		
+		DirectX::GraphicsResource SceneCBResource;//新規追加
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_pipelineState;//新規追加
 	};
 
