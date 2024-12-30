@@ -17,6 +17,15 @@ enum Descriptors
 	GamerPic,
 	Count
 };
+
+// Create root signature.
+enum RootParameterIndex
+{
+	ConstantBuffer,
+	TextureSRV,
+	TextureSampler,
+	RootParameterCount
+};
 struct SceneCB {
 	DirectX::XMFLOAT4X4 world;
 	DirectX::XMFLOAT4X4 view;

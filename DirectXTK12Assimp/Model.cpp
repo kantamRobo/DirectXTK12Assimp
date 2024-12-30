@@ -258,6 +258,24 @@ ComPtr<ID3D12PipelineState> education::Model::CreateGraphicsPipelineState(
         { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     };
 
+    D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
+        D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
+
+    // Create root parameters and initialize first (constants)
+    CD3DX12_ROOT_PARAMETER rootParameters[1] = {};
+    rootParameters[RootParameterIndex::ConstantBuffer].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL);
+
+    // Root parameter descriptor
+    CD3DX12_ROOT_SIGNATURE_DESC rsigDesc = {};
+
+    // use all parameters
+    rsigDesc.Init(static_cast<UINT>(std::size(rootParameters)), rootParameters, 0, nullptr, rootSignatureFlags);
+
+	DX::ThrowIfFailed(DirectX::CreateRootSignature(device.Get(), &rsigDesc, m_rootSignature.ReleaseAndGetAddressOf()));
+
     // ラスタライザーステート
     D3D12_RASTERIZER_DESC rasterizerDesc = {};
     rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
@@ -290,7 +308,7 @@ ComPtr<ID3D12PipelineState> education::Model::CreateGraphicsPipelineState(
     // グラフィックパイプラインステートの設定
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
     psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
-    psoDesc.pRootSignature = rootSignature.Get();
+    psoDesc.pRootSignature = m_rootSignature.Get();
     psoDesc.VS = { vertexShader->GetBufferPointer(), vertexShader->GetBufferSize() };
     psoDesc.PS = { pixelShader->GetBufferPointer(), pixelShader->GetBufferSize() };
     psoDesc.RasterizerState = rasterizerDesc;
@@ -351,14 +369,15 @@ void education::Model::Draw(const DX::DeviceResources* DR) {
     commandList->IASetIndexBuffer(&m_indexBufferView);
     commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
+	commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+    commandList->SetGraphicsRootConstantBufferView(0, SceneCBResource.GpuAddress());
    
 
     // ルートシグネチャ設定
     commandList->SetGraphicsRootSignature(m_rootSignature.Get());
 
-    
-    commandList->SetGraphicsRootDescriptorTable(0, m_resourceDescriptors->GetGpuHandle(Count));
+    //2024/12/30/9:42
+    commandList->SetGraphicsRootDescriptorTable(0, m_resourceDescriptors->GetGpuHandle(0));
 
     // パイプラインステート設定
     commandList->SetPipelineState(m_pipelineState.Get());
