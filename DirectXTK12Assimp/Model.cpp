@@ -35,7 +35,7 @@ education::Model::Model(DirectX::GraphicsMemory* graphicsmemory,DX::DeviceResour
     
 	// ルートシグネチャの作成
     
-	m_pipelineState = CreateGraphicsPipelineState(deviceresources->GetD3DDevice(), m_rootSignature, L"VertexShader.hlsl", L"PixelShader.hlsl");
+	m_pipelineState = CreateGraphicsPipelineState(deviceresources, m_rootSignature, L"VertexShader.hlsl", L"PixelShader.hlsl");
 	if (m_pipelineState == nullptr)
 	{
 		std::abort();
@@ -202,8 +202,8 @@ SceneCBResource = graphicsmemory->AllocateConstant(cb);
 using Microsoft::WRL::ComPtr;
 //(DIrectXTK12Assimpで追加)
 // グラフィックパイプラインステートを作成する関数
-ComPtr<ID3D12PipelineState> education::Model::CreateGraphicsPipelineState(
-    ComPtr<ID3D12Device> device,
+Microsoft::WRL::ComPtr<ID3D12PipelineState> education::Model::CreateGraphicsPipelineState(
+   DX::DeviceResources* deviceresources,
     ComPtr<ID3D12RootSignature> rootSignature,
     const std::wstring& vertexShaderPath,
     const std::wstring& pixelShaderPath)
@@ -212,7 +212,7 @@ ComPtr<ID3D12PipelineState> education::Model::CreateGraphicsPipelineState(
     ComPtr<ID3DBlob> vertexShader;
     ComPtr<ID3DBlob> pixelShader;
     ComPtr<ID3DBlob> errorBlob;
-
+    DirectX::RenderTargetState rtState(DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_D32_FLOAT);
     HRESULT hr = D3DCompileFromFile(
         vertexShaderPath.c_str(),
         nullptr,
@@ -274,7 +274,7 @@ ComPtr<ID3D12PipelineState> education::Model::CreateGraphicsPipelineState(
     // use all parameters
     rsigDesc.Init(static_cast<UINT>(std::size(rootParameters)), rootParameters, 0, nullptr, rootSignatureFlags);
 
-	DX::ThrowIfFailed(DirectX::CreateRootSignature(device.Get(), &rsigDesc, m_rootSignature.ReleaseAndGetAddressOf()));
+	DX::ThrowIfFailed(DirectX::CreateRootSignature(deviceresources->GetD3DDevice(), &rsigDesc, m_rootSignature.ReleaseAndGetAddressOf()));
 
     // ラスタライザーステート
     D3D12_RASTERIZER_DESC rasterizerDesc = {};
@@ -317,13 +317,13 @@ ComPtr<ID3D12PipelineState> education::Model::CreateGraphicsPipelineState(
     psoDesc.SampleMask = UINT_MAX;
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     psoDesc.NumRenderTargets = 1;
-    psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-    psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	psoDesc.RTVFormats[0] = rtState.rtvFormats[0];
+    psoDesc.DSVFormat = rtState.dsvFormat;
     psoDesc.SampleDesc.Count = 1;
 
     // パイプラインステートオブジェクトを作成
     ComPtr<ID3D12PipelineState> pipelineState;
-    hr = device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState));
+    hr = deviceresources->GetD3DDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState));
     if (FAILED(hr)) {
         throw std::runtime_error("Failed to create pipeline state");
     }
@@ -377,7 +377,7 @@ void education::Model::Draw(const DX::DeviceResources* DR) {
     commandList->SetGraphicsRootSignature(m_rootSignature.Get());
 
     //2024/12/30/9:42
-    commandList->SetGraphicsRootDescriptorTable(0, m_resourceDescriptors->GetGpuHandle(0));
+	commandList->SetGraphicsRootConstantBufferView(0, SceneCBResource.GpuAddress());
 
     // パイプラインステート設定
     commandList->SetPipelineState(m_pipelineState.Get());
