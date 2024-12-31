@@ -252,7 +252,7 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> education::Model::CreateGraphicsPipe
     }
 
     // 入力レイアウトを定義
-    D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
+    m_layout = {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -275,7 +275,7 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> education::Model::CreateGraphicsPipe
     rsigDesc.Init(static_cast<UINT>(std::size(rootParameters)), rootParameters, 0, nullptr, rootSignatureFlags);
 
 	DX::ThrowIfFailed(DirectX::CreateRootSignature(deviceresources->GetD3DDevice(), &rsigDesc, m_rootSignature.ReleaseAndGetAddressOf()));
-
+    /*
     // ラスタライザーステート
     D3D12_RASTERIZER_DESC rasterizerDesc = {};
     rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
@@ -297,14 +297,16 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> education::Model::CreateGraphicsPipe
     blendDesc.RenderTarget[0].BlendEnable = FALSE;
     blendDesc.RenderTarget[0].LogicOpEnable = FALSE;
     blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-
+    */
+    /*
     // 深度/ステンシルステート
     D3D12_DEPTH_STENCIL_DESC depthStencilDesc = {};
     depthStencilDesc.DepthEnable = TRUE;
     depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
     depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
     depthStencilDesc.StencilEnable = FALSE;
-
+    */
+    /*
     // グラフィックパイプラインステートの設定
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
     psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
@@ -320,10 +322,32 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> education::Model::CreateGraphicsPipe
 	psoDesc.RTVFormats[0] = rtState.rtvFormats[0];
     psoDesc.DSVFormat = rtState.dsvFormat;
     psoDesc.SampleDesc.Count = 1;
+    */
+    //https://github.com/microsoft/DirectXTK12/wiki/PSOs,-Shaders,-and-Signatures
+    // 
+    // 
+    D3D12_INPUT_LAYOUT_DESC inputlayaout = { m_layout.data(), m_layout.size()};
+    DirectX::EffectPipelineStateDescription pd(
+        &inputlayaout,
+        DirectX::CommonStates::Opaque,
+        DirectX::CommonStates::DepthDefault,
+        DirectX::CommonStates::CullCounterClockwise,
+        rtState);
+    D3D12_SHADER_BYTECODE vertexshaderBCode = { vertexShader->GetBufferPointer(), vertexShader->GetBufferSize()};
 
+    
+    D3D12_SHADER_BYTECODE pixelShaderBCode = { pixelShader->GetBufferPointer(), pixelShader->GetBufferSize()};
     // パイプラインステートオブジェクトを作成
     ComPtr<ID3D12PipelineState> pipelineState;
-    hr = deviceresources->GetD3DDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState));
+	pd.CreatePipelineState(
+		deviceresources->GetD3DDevice(),
+        m_rootSignature.Get(),
+        vertexshaderBCode,
+		
+        pixelShaderBCode,
+	
+		pipelineState.GetAddressOf()
+	);
     if (FAILED(hr)) {
         throw std::runtime_error("Failed to create pipeline state");
     }
@@ -369,8 +393,7 @@ void education::Model::Draw(const DX::DeviceResources* DR) {
     commandList->IASetIndexBuffer(&m_indexBufferView);
     commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	commandList->SetGraphicsRootSignature(m_rootSignature.Get());
-    commandList->SetGraphicsRootConstantBufferView(0, SceneCBResource.GpuAddress());
+
    
 
     // ルートシグネチャ設定
