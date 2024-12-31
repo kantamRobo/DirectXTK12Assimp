@@ -45,11 +45,8 @@ namespace education {
 		
 		
 		std::unique_ptr<DirectX::DescriptorHeap> m_resourceDescriptors;
-		Microsoft::WRL::ComPtr<ID3D12PipelineState> CreateGraphicsPipelineState(
-			DX::DeviceResources* deviceresources,
-			Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature,
-			const std::wstring& vertexShaderPath,
-			const std::wstring& pixelShaderPath);
+		
+		Microsoft::WRL::ComPtr<ID3D12PipelineState> CreateGraphicsPipelineState(DX::DeviceResources* deviceresources, const std::wstring& vertexShaderPath, const std::wstring& pixelShaderPath);
 		void CreateDescriptors(DX::DeviceResources* DR);
 		void Draw(const DX::DeviceResources* DR);
 		

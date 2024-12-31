@@ -35,7 +35,7 @@ education::Model::Model(DirectX::GraphicsMemory* graphicsmemory,DX::DeviceResour
     
 	// ルートシグネチャの作成
     
-	m_pipelineState = CreateGraphicsPipelineState(deviceresources, m_rootSignature, L"VertexShader.hlsl", L"PixelShader.hlsl");
+	m_pipelineState = CreateGraphicsPipelineState(deviceresources,  L"VertexShader.hlsl", L"PixelShader.hlsl");
 	if (m_pipelineState == nullptr)
 	{
 		std::abort();
@@ -204,7 +204,7 @@ using Microsoft::WRL::ComPtr;
 // グラフィックパイプラインステートを作成する関数
 Microsoft::WRL::ComPtr<ID3D12PipelineState> education::Model::CreateGraphicsPipelineState(
    DX::DeviceResources* deviceresources,
-    ComPtr<ID3D12RootSignature> rootSignature,
+    
     const std::wstring& vertexShaderPath,
     const std::wstring& pixelShaderPath)
 {
