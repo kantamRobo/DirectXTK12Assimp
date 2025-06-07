@@ -58,9 +58,12 @@ namespace education {
 		const aiScene* m_scene;
 		Assimp::Importer m_importer;
 
+		DirectX::GraphicsResource m_vertexBuffer;//新規追加
+		DirectX::GraphicsResource m_indexBuffer;//新規追加
+		//DirectX::GraphicsResource m_ConstantBuffer;//新規追加
 		//バッファ
-		Microsoft::WRL::ComPtr<ID3D12Resource> m_vertexBuffer;
-		Microsoft::WRL::ComPtr<ID3D12Resource> m_indexBuffer;
+		//Microsoft::WRL::ComPtr<ID3D12Resource> m_vertexBuffer;
+		//Microsoft::WRL::ComPtr<ID3D12Resource> m_indexBuffer;
 		Microsoft::WRL::ComPtr<ID3D12Resource> m_ConstantBuffer;
 
 		std::vector<D3D12_INPUT_ELEMENT_DESC> m_layout;

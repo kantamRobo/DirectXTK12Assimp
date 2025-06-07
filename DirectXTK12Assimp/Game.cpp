@@ -205,7 +205,7 @@ void Game::CreateDeviceDependentResources()
     m_graphicsMemory = std::make_unique<GraphicsMemory>(device);
 
     // TODO: Initialize device dependent objects here (independent of window size).
-	m_model = std::make_unique<education::Model>(m_graphicsMemory.get(), m_deviceResources.get(), "C:\\Users\\hatte\\source\\repos\\DirectXTK12Assimp\\DirectXTK12Assimp\\untitled.obj", m_height, m_width);
+	m_model = std::make_unique<education::Model>(m_graphicsMemory.get(), m_deviceResources.get(), "C:\\Users\\User\\source\\repos\\DirectXTK12Assimp\\DirectXTK12Assimp\\–³‘è.obj", m_height, m_width);
 }
 
 // Allocate all memory resources that change on a window SizeChanged event.
